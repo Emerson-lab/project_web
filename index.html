@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="style.css" rel="stylesheet"/>
+  <title>App Comercial JS | Protótipo</title>
+</head>
+
+<body>
+  <h1>Compartilhamento de Telas</h1>
+  <button id="startSharing">Compartilhar Tela</button>
+  <video muted id="screenVideoShare" autoplay playsinline></video>
+  <script>
+    const startSharing = document.getElementById('startSharing');
+    const videoScreen = document.getElementById('screenVideoShare');
+
+    let mediaRecorder;
+    let recordedChunks = [];
+
+    startSharing.addEventListener('click', async () => {
+      try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            cursor: 'always'
+          },
+          audio: false
+        });
+
+        const audioStream = await navigator.mediaDevices.getUserMedia({
+          audio: true
+        });
+
+        const combineStreams = new MediaStream([
+          ...screenStream.getVideoTracks(),
+          ...audioStream.getAudioTracks()
+        ]);
+
+        videoScreen.srcObject = combineStreams;
+
+        videoScreen.onloadedmetadata = () => {
+          videoScreen.play();
+        }
+
+        combineStreams.getVideoTracks()[0].onended = () => {
+          stopSharing();
+        }
+
+        startRecording(combineStreams);
+
+      }catch(error) {
+        console.log(`O seguinte erro ocorreu: ${error}`);
+      }
+    });
+
+    const startRecording = (mediaStream) => {
+      mediaRecorder = new MediaRecorder(mediaStream, {mimeType:"video/webm"});
+
+      mediaRecorder.ondataavailable = (event) => {
+        // console.log(event.data);
+        recordedChunks.push(event.data);
+        // console.log(recordedChunks);
+      }
+
+      mediaRecorder.start();
+
+      mediaRecorder.onstop = () => {
+        dowloadVideo();
+      }
+
+      // let interval = setInterval(() => {
+      //   mediaRecorder.requestData();
+      // }, 500);
+
+    };
+    
+    const stopSharing = () => {
+      if(videoScreen.srcObject) {
+        videoScreen.srcObject.getTracks().forEach(track => track.stop());
+        videoScreen.srcObject = null;
+      }
+
+      if(mediaRecorder) {
+        mediaRecorder.stop();
+      }
+    };
+
+    const dowloadVideo = () => {
+      const blob = new Blob(recordedChunks, {type:"video/webm"});
+      const url = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      document.body.appendChild(a);
+      a.style.display = "none";
+      a.href = url;
+      a.download = "video-navigator.mp4";
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }
+  </script>
+</body>
+
+</html>
